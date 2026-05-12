@@ -1,0 +1,8 @@
+# bub — automatic-mode schedule.
+# Copy to ~/.config/.bub.yaml and tweak. Every field is optional; anything you
+# omit (or set to 0) falls back to the classic Pomodoro defaults shown here.
+
+work_minutes: 25
+short_break_minutes: 5
+long_break_minutes: 15
+long_break_every: 4    # take a long break instead of a short one every 4th work block
