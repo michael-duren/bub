@@ -137,7 +137,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			next, advCmd := m.advance()
 			return next, tea.Batch(
-				tea.Printf("%s  %s complete (%s)", icon(done.Kind), label(done.Kind), clock(done.Duration)),
+				tea.Printf("✓  %s  ·  %s", headline(done), clock(done.Duration)),
 				ringBell(),
 				advCmd,
 				tick(),
@@ -180,9 +180,13 @@ func (m Model) View() string {
 
 	var b strings.Builder
 	b.WriteString("\n  ")
-	b.WriteString(titleStyle.Render(fmt.Sprintf("%s  %s", icon(m.step.Kind), label(m.step.Kind))))
+	b.WriteString(titleStyle.Render(headline(m.step)))
 	if m.paused {
 		b.WriteString(dimStyle.Render("   ⏸ paused"))
+	}
+	if d := detail(m.step); d != "" {
+		b.WriteString("\n  ")
+		b.WriteString(dimStyle.Render(d))
 	}
 
 	b.WriteString("\n\n  ")
@@ -199,6 +203,32 @@ func (m Model) View() string {
 	b.WriteString(dimStyle.Render("space pause · s skip · r restart · q quit"))
 	b.WriteString("\n")
 	return b.String()
+}
+
+// headline is the "🍅  Focus" line for a step. In automatic mode (SetSize > 0)
+// it carries the running session number, e.g. "🍅  Focus #3" / "☕  Break #2".
+func headline(s schedule.Step) string {
+	if s.SetSize > 0 {
+		return fmt.Sprintf("%s  %s #%d", icon(s.Kind), label(s.Kind), s.Ordinal)
+	}
+	return fmt.Sprintf("%s  %s", icon(s.Kind), label(s.Kind))
+}
+
+// detail says where the step sits in the Pomodoro cycle, e.g.
+// "3 of 4 before a long break". It is empty in manual mode.
+func detail(s schedule.Step) string {
+	if s.SetSize <= 1 {
+		return ""
+	}
+	switch s.Kind {
+	case schedule.Work:
+		return fmt.Sprintf("%d of %d before a long break", s.SetPosition, s.SetSize)
+	case schedule.LongBreak:
+		return "set complete — fresh start next"
+	default: // short break
+		left := s.SetSize - s.SetPosition
+		return fmt.Sprintf("%d pomodoro%s until a long break", left, plural(left))
+	}
 }
 
 func label(k schedule.Kind) string {

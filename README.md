@@ -4,11 +4,16 @@ A tiny Pomodoro timer for the terminal — built with [Bubble Tea][bt],
 [Bubbles][bubbles] (the `progress` component), and [Lip Gloss][lg].
 
 ```
-🍅  Focus
+🍅  Focus #3
+  3 of 4 before a long break
   ████████████████░░░░░░░░░░░░░░░░░░░░░░░░  41%
   14:42  /  25:00   ·   2 pomodoros done
   space pause · s skip · r restart · q quit
 ```
+
+In automatic mode the title shows the running session number (`Focus #3`,
+`Break #2`, …) and the line under it shows where you are in the cycle. Manual
+runs (`bub work 25`) are a single block, so they just show `🍅  Focus`.
 
 ## Install
 
