@@ -24,6 +24,20 @@ const (
 type Step struct {
 	Kind     Kind
 	Duration time.Duration
+
+	// Ordinal is the 1-based sequence number of this step among steps of the
+	// same family — work blocks are numbered separately from breaks. It is 1
+	// in a manual one-shot run.
+	Ordinal int
+
+	// SetSize is how many work blocks happen before a long break (the config's
+	// long_break_every). It is 0 in a manual run, where there is no "set".
+	SetSize int
+
+	// SetPosition is, for a Work step, its 1-based position within the current
+	// set (1..SetSize); for a break it is the position of the work block that
+	// just finished. It is 0 when SetSize is 0.
+	SetPosition int
 }
 
 // Provider yields the steps of a run in order. A manual run returns a single
@@ -36,7 +50,7 @@ type Provider interface {
 // Manual returns a one-shot provider: a single step of the given kind and
 // duration, after which the run is complete.
 func Manual(k Kind, d time.Duration) Provider {
-	return &manual{step: Step{Kind: k, Duration: d}}
+	return &manual{step: Step{Kind: k, Duration: d, Ordinal: 1}}
 }
 
 type manual struct {
@@ -61,22 +75,54 @@ func Auto(cfg config.Config) Provider {
 
 type auto struct {
 	cfg           config.Config
-	workCompleted int  // number of work blocks finished so far
-	expectBreak   bool // true once a work block has been handed out
+	workStarted   int  // number of work blocks handed out so far
+	breaksStarted int  // number of breaks handed out so far
+	expectBreak   bool // true once a work block has been handed out and not yet followed by its break
 }
 
 func (a *auto) Next() (Step, bool) {
+	perSet := a.cfg.LongBreakEvery
+	if perSet < 1 {
+		perSet = 1
+	}
+
 	if !a.expectBreak {
 		a.expectBreak = true
-		return Step{Kind: Work, Duration: a.cfg.WorkDuration()}, true
+		a.workStarted++
+		return Step{
+			Kind:        Work,
+			Duration:    a.cfg.WorkDuration(),
+			Ordinal:     a.workStarted,
+			SetSize:     perSet,
+			SetPosition: positionInSet(a.workStarted, perSet),
+		}, true
 	}
 
-	// We just handed out a work block last time; that block is now done.
-	a.workCompleted++
+	// The work block handed out last time is now finished; queue its break.
 	a.expectBreak = false
+	a.breaksStarted++
+	pos := positionInSet(a.workStarted, perSet)
 
-	if a.cfg.LongBreakEvery > 0 && a.workCompleted%a.cfg.LongBreakEvery == 0 {
-		return Step{Kind: LongBreak, Duration: a.cfg.LongBreakDuration()}, true
+	step := Step{
+		Duration:    a.cfg.ShortBreakDuration(),
+		Kind:        ShortBreak,
+		Ordinal:     a.breaksStarted,
+		SetSize:     perSet,
+		SetPosition: pos,
 	}
-	return Step{Kind: ShortBreak, Duration: a.cfg.ShortBreakDuration()}, true
+	if pos == perSet { // just completed the last work block of the set
+		step.Kind = LongBreak
+		step.Duration = a.cfg.LongBreakDuration()
+	}
+	return step, true
+}
+
+// positionInSet maps a 1-based work-block index to its 1-based position
+// within a set of size perSet (so the perSet-th block reports perSet, not 0).
+func positionInSet(workIndex, perSet int) int {
+	pos := workIndex % perSet
+	if pos == 0 {
+		return perSet
+	}
+	return pos
 }
