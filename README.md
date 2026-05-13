@@ -1,5 +1,7 @@
 # bub
 
+<img src="img/bub.png" alt="bub mascot" width="160" align="right" />
+
 A tiny Pomodoro timer for the terminal — built with [Bubble Tea][bt],
 [Bubbles][bubbles] (the `progress` component), and [Lip Gloss][lg].
 
@@ -60,12 +62,20 @@ break taking the place of every 4th short break.
 
 ## Notifications (macOS)
 
-When running on macOS, bub sends a native push notification via `osascript`
-each time a step finishes. The notification title names the completed step
-(e.g. `🍅  Focus #1 done`) and the body shows the elapsed time plus what's
-coming next (e.g. `25:00 elapsed · up next: Break`).
+When running on macOS, bub sends a native push notification each time a step
+finishes. The notification title names the completed step (e.g. `🍅  Focus #1
+done`) and the body shows the elapsed time plus what's coming next (e.g.
+`25:00 elapsed · up next: Break`).
 
-No configuration is required. On other platforms the feature is a no-op.
+If [`terminal-notifier`](https://github.com/julienXX/terminal-notifier) is
+installed, bub uses it to show the custom bub icon in the banner:
+
+```sh
+brew install terminal-notifier
+```
+
+Without `terminal-notifier`, bub falls back to `osascript` (no custom icon).
+On other platforms the feature is a no-op.
 
 ## Config
 

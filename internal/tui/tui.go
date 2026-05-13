@@ -48,11 +48,35 @@ func ringBell() tea.Cmd {
 }
 
 // sendNotification sends a macOS push notification when running on darwin.
-// It blocks until osascript exits, so it is safe to call before tea.Quit.
-func sendNotification(title, body string) {
+// It blocks until the notifier exits, so it is safe to call before tea.Quit.
+// If terminal-notifier is available and iconBytes is non-nil, the custom icon
+// is written to a temp file and passed as -contentImage.
+func sendNotification(title, body string, iconBytes []byte) {
 	if runtime.GOOS != "darwin" {
 		return
 	}
+
+	// Prefer terminal-notifier for custom icon support.
+	if path, err := exec.LookPath("terminal-notifier"); err == nil {
+		args := []string{"-title", title, "-message", body, "-sender", "com.apple.Terminal"}
+		if len(iconBytes) > 0 {
+			tmp, err := os.CreateTemp("", "bub-icon-*.png")
+			if err == nil {
+				if _, werr := tmp.Write(iconBytes); werr == nil {
+					tmp.Close()
+					args = append(args, "-contentImage", tmp.Name())
+				} else {
+					tmp.Close()
+					os.Remove(tmp.Name())
+				}
+			}
+		}
+		//nolint:errcheck
+		exec.Command(path, args...).Run()
+		return
+	}
+
+	// Fallback: plain osascript (no custom icon).
 	script := fmt.Sprintf(`display notification %q with title %q`, body, title)
 	//nolint:errcheck
 	exec.Command("osascript", "-e", script).Run()
@@ -60,17 +84,18 @@ func sendNotification(title, body string) {
 
 // notify wraps sendNotification as a tea.Cmd for use in the normal (non-final)
 // step transition, where Bubble Tea will schedule it as usual.
-func notify(title, body string) tea.Cmd {
+func notify(title, body string, iconBytes []byte) tea.Cmd {
 	return func() tea.Msg {
-		sendNotification(title, body)
+		sendNotification(title, body, iconBytes)
 		return nil
 	}
 }
 
 // Model is the Bubble Tea model for a bub run.
 type Model struct {
-	provider schedule.Provider
-	step     schedule.Step
+	provider  schedule.Provider
+	step      schedule.Step
+	iconBytes []byte // embedded alert icon for macOS notifications
 
 	progress progress.Model
 	elapsed  time.Duration
@@ -81,16 +106,18 @@ type Model struct {
 }
 
 // New builds a Model from a schedule provider. It returns ok == false when the
-// provider has no steps at all.
-func New(p schedule.Provider) (Model, bool) {
+// provider has no steps at all. iconBytes is the PNG to show in macOS
+// notifications; pass nil to use the system default.
+func New(p schedule.Provider, iconBytes []byte) (Model, bool) {
 	step, ok := p.Next()
 	if !ok {
 		return Model{}, false
 	}
 	return Model{
-		provider: p,
-		step:     step,
-		progress: newBar(step.Kind, 0),
+		provider:  p,
+		step:      step,
+		iconBytes: iconBytes,
+		progress:  newBar(step.Kind, 0),
 	}, true
 }
 
@@ -160,12 +187,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if nextModel.finished {
 				// Run is over — send the notification synchronously before
 				// tea.Quit is processed, otherwise Bubble Tea exits too fast.
-				sendNotification(notifTitle, notifBody)
+				sendNotification(notifTitle, notifBody, m.iconBytes)
 			}
 			return nextModel, tea.Batch(
 				tea.Printf("✓  %s  ·  %s", headline(done), clock(done.Duration)),
 				ringBell(),
-				notify(notifTitle, notifBody),
+				notify(notifTitle, notifBody, m.iconBytes),
 				advCmd,
 				tick(),
 			)

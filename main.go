@@ -15,6 +15,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,6 +27,9 @@ import (
 	"github.com/michael-duren/bub/internal/schedule"
 	"github.com/michael-duren/bub/internal/tui"
 )
+
+//go:embed img/bub-alert.png
+var alertIcon []byte
 
 const usage = `bub — a Pomodoro timer
 
@@ -72,7 +76,7 @@ func run(args []string) error {
 		return err
 	}
 
-	m, ok := tui.New(provider)
+	m, ok := tui.New(provider, alertIcon)
 	if !ok {
 		return nil // nothing scheduled
 	}
