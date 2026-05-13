@@ -47,18 +47,22 @@ func ringBell() tea.Cmd {
 	}
 }
 
-// notify sends a macOS push notification when running on darwin.
+// sendNotification sends a macOS push notification when running on darwin.
+// It blocks until osascript exits, so it is safe to call before tea.Quit.
+func sendNotification(title, body string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	script := fmt.Sprintf(`display notification %q with title %q`, body, title)
+	//nolint:errcheck
+	exec.Command("osascript", "-e", script).Run()
+}
+
+// notify wraps sendNotification as a tea.Cmd for use in the normal (non-final)
+// step transition, where Bubble Tea will schedule it as usual.
 func notify(title, body string) tea.Cmd {
 	return func() tea.Msg {
-		if runtime.GOOS != "darwin" {
-			return nil
-		}
-		script := fmt.Sprintf(
-			`display notification %q with title %q`,
-			body, title,
-		)
-		//nolint:errcheck
-		exec.Command("osascript", "-e", script).Run()
+		sendNotification(title, body)
 		return nil
 	}
 }
@@ -152,6 +156,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			notifBody := clock(done.Duration) + " elapsed"
 			if !nextModel.finished {
 				notifBody += " · up next: " + label(nextModel.step.Kind)
+			}
+			if nextModel.finished {
+				// Run is over — send the notification synchronously before
+				// tea.Quit is processed, otherwise Bubble Tea exits too fast.
+				sendNotification(notifTitle, notifBody)
 			}
 			return nextModel, tea.Batch(
 				tea.Printf("✓  %s  ·  %s", headline(done), clock(done.Duration)),
