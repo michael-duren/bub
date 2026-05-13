@@ -58,7 +58,7 @@ func sendNotification(title, body string, iconBytes []byte) {
 
 	// Prefer terminal-notifier for custom icon support.
 	if path, err := exec.LookPath("terminal-notifier"); err == nil {
-		args := []string{"-title", title, "-message", body, "-sender", "com.apple.Terminal"}
+		args := []string{"-title", title, "-message", body, "-sender", "com.apple.Terminal", "-sound", "default"}
 		if len(iconBytes) > 0 {
 			tmp, err := os.CreateTemp("", "bub-icon-*.png")
 			if err == nil {
