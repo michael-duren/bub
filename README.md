@@ -58,6 +58,15 @@ break taking the place of every 4th short break.
 | `r`            | restart current step |
 | `q` / `ctrl+c` | quit                 |
 
+## Notifications (macOS)
+
+When running on macOS, bub sends a native push notification via `osascript`
+each time a step finishes. The notification title names the completed step
+(e.g. `🍅  Focus #1 done`) and the body shows the elapsed time plus what's
+coming next (e.g. `25:00 elapsed · up next: Break`).
+
+No configuration is required. On other platforms the feature is a no-op.
+
 ## Config
 
 Automatic mode reads `~/.config/.bub.yaml` if it exists. All fields are

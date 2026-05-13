@@ -6,6 +6,8 @@ package tui
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -41,6 +43,22 @@ func tick() tea.Cmd {
 func ringBell() tea.Cmd {
 	return func() tea.Msg {
 		fmt.Fprint(os.Stderr, "\a")
+		return nil
+	}
+}
+
+// notify sends a macOS push notification when running on darwin.
+func notify(title, body string) tea.Cmd {
+	return func() tea.Msg {
+		if runtime.GOOS != "darwin" {
+			return nil
+		}
+		script := fmt.Sprintf(
+			`display notification %q with title %q`,
+			body, title,
+		)
+		//nolint:errcheck
+		exec.Command("osascript", "-e", script).Run()
 		return nil
 	}
 }
@@ -110,13 +128,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		w := msg.Width - 8
-		if w > 50 {
-			w = 50
-		}
-		if w < 12 {
-			w = 12
-		}
+		w := max(min(msg.Width-8, 50), 12)
 		m.progress.Width = w
 		return m, nil
 
@@ -135,10 +147,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if done.Kind == schedule.Work {
 				m.workDone++
 			}
-			next, advCmd := m.advance()
-			return next, tea.Batch(
+			nextModel, advCmd := m.advance()
+			notifTitle := headline(done) + " done"
+			notifBody := clock(done.Duration) + " elapsed"
+			if !nextModel.finished {
+				notifBody += " · up next: " + label(nextModel.step.Kind)
+			}
+			return nextModel, tea.Batch(
 				tea.Printf("✓  %s  ·  %s", headline(done), clock(done.Duration)),
 				ringBell(),
+				notify(notifTitle, notifBody),
 				advCmd,
 				tick(),
 			)
@@ -173,10 +191,7 @@ func (m Model) advance() (Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (m Model) View() string {
-	remaining := m.step.Duration - m.elapsed
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := max(m.step.Duration-m.elapsed, 0)
 
 	var b strings.Builder
 	b.WriteString("\n  ")

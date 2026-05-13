@@ -81,10 +81,7 @@ type auto struct {
 }
 
 func (a *auto) Next() (Step, bool) {
-	perSet := a.cfg.LongBreakEvery
-	if perSet < 1 {
-		perSet = 1
-	}
+	perSet := max(a.cfg.LongBreakEvery, 1)
 
 	if !a.expectBreak {
 		a.expectBreak = true
