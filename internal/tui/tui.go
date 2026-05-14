@@ -101,6 +101,8 @@ type Model struct {
 	elapsed  time.Duration
 	paused   bool
 
+	width    int
+	height   int
 	workDone int  // number of work blocks completed this run
 	finished bool // run is over (manual one-shot done)
 }
@@ -135,7 +137,7 @@ func newBar(k schedule.Kind, width int) progress.Model {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
-	return tick()
+	return tea.Batch(tea.EnterAltScreen, tick())
 }
 
 // Update implements tea.Model.
@@ -159,7 +161,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		w := max(min(msg.Width-8, 50), 12)
+		m.width = msg.Width
+		m.height = msg.Height
+		w := max(min(msg.Width/2, 80), 12)
 		m.progress.Width = w
 		return m, nil
 
@@ -253,7 +257,15 @@ func (m Model) View() string {
 	b.WriteString("\n\n  ")
 	b.WriteString(dimStyle.Render("space pause · s skip · r restart · q quit"))
 	b.WriteString("\n")
-	return b.String()
+
+	if m.width == 0 || m.height == 0 {
+		return b.String()
+	}
+	return lipgloss.Place(
+		m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		b.String(),
+	)
 }
 
 // headline is the "🍅  Focus" line for a step. In automatic mode (SetSize > 0)
